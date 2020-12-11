@@ -1,48 +1,54 @@
-const express = require('express');
-const axios = require('axios');
-const fs = require('fs');
-const path = require('path');
+const express = require( 'express' );
+const ejs = require( 'ejs' );
+const mongoose = require( 'mongoose' );
+
 
 const app = express();
 
-app.use(express.static('public'));
-app.use(express.urlencoded({ extended: true }));
-const filePath = './subscribers.json';
-const subscribersData = require(filePath);
-const PORT = 3000;
+mongoose.connect( 'mongodb://localhost:27017/subscriberDB', { useNewUrlParser: true, useUnifiedTopology: true} );
 
-app.get('/', (req, res) => {
-  res.sendFile(__dirname + '/signup.html');
-});
+const subscriberSchema = new mongoose.Schema( {
+  firstName: String,
+  lastName: String,
+  email: String
+})
 
-app.post('/', (req, res) => {
+const Subscriber = mongoose.model( 'Subscriber', subscriberSchema );
+
+app.set( 'view engine', 'ejs' );
+app.use( express.static( 'public' ) );
+app.use( express.urlencoded( { extended: true } ) );
+
+
+app.get( '/', ( req, res ) => {
+  res.render( 'signup' );
+} )
+
+
+app.post( '/', ( req, res ) => {
   const { firstName, lastName, email } = req.body;
 
-  const newMember = {
-    email_address: email,
-    status: 'subscribed',
-    merge_fields: {
-      FNAME: firstName,
-      LNAME: lastName,
-    },
-  };
+  if ( firstName && lastName && email ) {
+    const newSubscriber = new Subscriber( {
+    firstName: firstName,
+    lastName: lastName,
+    email: email
+  } )
+  
+    newSubscriber.save( ( err, info ) => {
+      console.log( info );
+    res.render('success', {firstName: info.firstName})
+  })
+  } else {
+    res.render( 'failure' );
+  }
 
-  subscribersData.push(newMember);
-  const pathToFile = path.join(__dirname, filePath);
-  const jsonData = JSON.stringify(subscribersData, null, 4);
-  console.log(jsonData);
 
-  fs.writeFile(pathToFile, jsonData, (err) => {
-    if (err) {
-      res.sendFile(__dirname + '/failure.html');
-    }
+} )
 
-    res.sendFile(__dirname + '/success.html');
-  });
-});
+app.post( '/failure', ( req, res ) => {
+  res.redirect( '/' );
+})
 
-app.post('/failure', (req, res) => {
-  res.redirect('/');
-});
 
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen( 3000, () => console.log( 'Server is running on port 3000' ) );
